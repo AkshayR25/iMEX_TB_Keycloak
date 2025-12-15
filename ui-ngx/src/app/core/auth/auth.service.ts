@@ -35,7 +35,7 @@ import {
 } from './auth.actions';
 import { getCurrentAuthState, getCurrentAuthUser } from './auth.selectors';
 import { Authority } from '@shared/models/authority.enum';
-import { AuthPayload, AuthState, SysParams, SysParamsState } from '@core/auth/auth.models';
+import { AuthPayload, AuthState, SysParams, SysParamsState, OAuth2SessionValidationRequest, OAuth2SessionValidationResponse } from '@core/auth/auth.models';
 import { TranslateService } from '@ngx-translate/core';
 import { AuthUser } from '@shared/models/user.model';
 import { TimeService } from '@core/services/time.service';
@@ -48,7 +48,7 @@ import { TwoFactorAuthProviderType, TwoFaProviderInfo } from '@shared/models/two
 import { UserPasswordPolicy } from '@shared/models/settings.models';
 
 @Injectable({
-    providedIn: 'root'
+  providedIn: 'root'
 })
 export class AuthService {
 
@@ -90,6 +90,35 @@ export class AuthService {
     localStorage.removeItem('jwt_token_expiration');
     localStorage.removeItem('refresh_token');
     localStorage.removeItem('refresh_token_expiration');
+    localStorage.removeItem('oauth2_refresh_token');
+    localStorage.removeItem('oauth2_client_id');
+  }
+
+  private static getOAuth2RefreshToken() {
+    const token = AuthService._storeGet('oauth2_refresh_token');
+    if (token) {
+      console.log('[OAuth2 Session] OAuth2 refresh token found in localStorage');
+    }
+    return token;
+  }
+
+  private static getOAuth2ClientId() {
+    const clientId = AuthService._storeGet('oauth2_client_id');
+    if (clientId) {
+      console.log('[OAuth2 Session] OAuth2 client ID found in localStorage:', clientId);
+    }
+    return clientId;
+  }
+
+  private static setOAuth2Tokens(refreshToken: string, clientId: string) {
+    if (refreshToken) {
+      localStorage.setItem('oauth2_refresh_token', refreshToken);
+      console.log('[OAuth2 Session] Stored OAuth2 refresh token in localStorage');
+    }
+    if (clientId) {
+      localStorage.setItem('oauth2_client_id', clientId);
+      console.log('[OAuth2 Session] Stored OAuth2 client ID in localStorage:', clientId);
+    }
   }
 
   public static getJwtToken() {
@@ -113,22 +142,22 @@ export class AuthService {
   public login(loginRequest: LoginRequest): Observable<LoginResponse> {
     return this.http.post<LoginResponse>('/api/auth/login', loginRequest, defaultHttpOptions()).pipe(
       tap((loginResponse: LoginResponse) => {
-          this.setUserFromJwtToken(loginResponse.token, loginResponse.refreshToken, true);
-          if (loginResponse.scope === Authority.PRE_VERIFICATION_TOKEN) {
-            this.router.navigateByUrl(`login/mfa`);
-          }
+        this.setUserFromJwtToken(loginResponse.token, loginResponse.refreshToken, true);
+        if (loginResponse.scope === Authority.PRE_VERIFICATION_TOKEN) {
+          this.router.navigateByUrl(`login/mfa`);
         }
+      }
       ));
   }
 
   public checkTwoFaVerificationCode(providerType: TwoFactorAuthProviderType, verificationCode: number): Observable<LoginResponse> {
     return this.http.post<LoginResponse>
-    (`/api/auth/2fa/verification/check?providerType=${providerType}&verificationCode=${verificationCode}`,
-      null, defaultHttpOptions(false, true)).pipe(
-      tap((loginResponse: LoginResponse) => {
-          this.setUserFromJwtToken(loginResponse.token, loginResponse.refreshToken, true);
-        }
-      ));
+      (`/api/auth/2fa/verification/check?providerType=${providerType}&verificationCode=${verificationCode}`,
+        null, defaultHttpOptions(false, true)).pipe(
+          tap((loginResponse: LoginResponse) => {
+            this.setUserFromJwtToken(loginResponse.token, loginResponse.refreshToken, true);
+          }
+          ));
   }
 
   public publicLogin(publicId: string): Observable<LoginResponse> {
@@ -140,27 +169,27 @@ export class AuthService {
 
   public sendResetPasswordLink(email: string) {
     return this.http.post('/api/noauth/resetPasswordByEmail',
-      {email}, defaultHttpOptions());
+      { email }, defaultHttpOptions());
   }
 
   public activate(activateToken: string, password: string, sendActivationMail: boolean): Observable<LoginResponse> {
     return this.http.post<LoginResponse>(`/api/noauth/activate?sendActivationMail=${sendActivationMail}`,
-      {activateToken, password}, defaultHttpOptions()).pipe(
-      tap((loginResponse: LoginResponse) => {
+      { activateToken, password }, defaultHttpOptions()).pipe(
+        tap((loginResponse: LoginResponse) => {
           this.setUserFromJwtToken(loginResponse.token, loginResponse.refreshToken, true);
         }
-      ));
+        ));
   }
 
   public resetPassword(resetToken: string, password: string): Observable<void> {
-    return this.http.post<void>('/api/noauth/resetPassword', {resetToken, password}, defaultHttpOptions());
+    return this.http.post<void>('/api/noauth/resetPassword', { resetToken, password }, defaultHttpOptions());
   }
 
   public changePassword(currentPassword: string, newPassword: string, config?: RequestConfig) {
-    return this.http.post('/api/auth/changePassword', {currentPassword, newPassword}, defaultHttpOptionsFromConfig(config)).pipe(
+    return this.http.post('/api/auth/changePassword', { currentPassword, newPassword }, defaultHttpOptionsFromConfig(config)).pipe(
       tap((loginResponse: LoginResponse) => {
-          this.setUserFromJwtToken(loginResponse.token, loginResponse.refreshToken, false);
-        }
+        this.setUserFromJwtToken(loginResponse.token, loginResponse.refreshToken, false);
+      }
       ));
   }
 
@@ -182,8 +211,8 @@ export class AuthService {
   public loginAsUser(userId: string) {
     return this.http.get<LoginResponse>(`/api/user/${userId}/token`, defaultHttpOptions()).pipe(
       tap((loginResponse: LoginResponse) => {
-          this.setUserFromJwtToken(loginResponse.token, loginResponse.refreshToken, true);
-        }
+        this.setUserFromJwtToken(loginResponse.token, loginResponse.refreshToken, true);
+      }
       ));
   }
 
@@ -194,8 +223,8 @@ export class AuthService {
     if (!ignoreRequest) {
       this.http.post('/api/auth/logout', null, defaultHttpOptions(true, true))
         .subscribe(() => {
-            this.clearJwtToken();
-          },
+          this.clearJwtToken();
+        },
           () => {
             this.clearJwtToken();
           }
@@ -206,7 +235,7 @@ export class AuthService {
   }
 
   private notifyUserLoaded(isUserLoaded: boolean) {
-    this.store.dispatch(new ActionAuthLoadUser({isUserLoaded}));
+    this.store.dispatch(new ActionAuthLoadUser({ isUserLoaded }));
   }
 
   public gotoDefaultPlace(isAuthenticated: boolean) {
@@ -223,11 +252,52 @@ export class AuthService {
     const url = '/api/noauth/oauth2Clients?platform=' + PlatformType.WEB;
     return this.http.post<Array<OAuth2ClientLoginInfo>>(url,
       null, defaultHttpOptions()).pipe(
-      catchError(err => of([])),
-      tap((OAuth2Clients) => {
-        this.oauth2Clients = OAuth2Clients;
-      })
-    );
+        catchError(err => of([])),
+        tap((OAuth2Clients) => {
+          this.oauth2Clients = OAuth2Clients;
+        })
+      );
+  }
+
+  /**
+   * Redirects to OAuth2/Keycloak login page for re-authentication
+   * Used when user change is detected to allow seamless re-login
+   */
+  private redirectToOAuth2Login(clientId: string) {
+    console.log('[OAuth2 Session] Redirecting to OAuth2 login for re-authentication');
+
+    // Find the OAuth2 client to get the login URL
+    if (!this.oauth2Clients || this.oauth2Clients.length === 0) {
+      // Load OAuth2 clients first
+      this.loadOAuth2Clients().subscribe(
+        (clients) => {
+          // OAuth2ClientLoginInfo uses 'name' property, not 'clientId'
+          // Try to find by name or just use the first OAuth2 client
+          const client = clients.length > 0 ? clients[0] : null;
+          if (client && client.url) {
+            console.log('[OAuth2 Session] Redirecting to:', client.url);
+            window.location.href = client.url;
+          } else {
+            console.warn('[OAuth2 Session] OAuth2 client not found, falling back to logout');
+            this.logout(false, true);
+          }
+        },
+        () => {
+          console.error('[OAuth2 Session] Failed to load OAuth2 clients, falling back to logout');
+          this.logout(false, true);
+        }
+      );
+    } else {
+      // Use the first available OAuth2 client (typically there's only one)
+      const client = this.oauth2Clients.length > 0 ? this.oauth2Clients[0] : null;
+      if (client && client.url) {
+        console.log('[OAuth2 Session] Redirecting to:', client.url);
+        window.location.href = client.url;
+      } else {
+        console.warn('[OAuth2 Session] OAuth2 client not found, falling back to logout');
+        this.logout(false, true);
+      }
+    }
   }
 
   public getAvailableTwoFaLoginProviders(): Observable<Array<TwoFaProviderInfo>> {
@@ -250,7 +320,7 @@ export class AuthService {
               return true;
             }
           } else if (path.startsWith('dashboard.') || path.startsWith('dashboards.') &&
-              authState.allowedDashboardIds.indexOf(params.dashboardId) > -1) {
+            authState.allowedDashboardIds.indexOf(params.dashboardId) > -1) {
             return false;
           } else {
             return true;
@@ -299,6 +369,8 @@ export class AuthService {
       const publicId = this.utils.getQueryParam('publicId');
       const accessToken = this.utils.getQueryParam('accessToken');
       const refreshToken = this.utils.getQueryParam('refreshToken');
+      const oauth2RefreshToken = this.utils.getQueryParam('oauth2RefreshToken');
+      const oauth2ClientId = this.utils.getQueryParam('oauth2ClientId');
       const username = this.utils.getQueryParam('username');
       const password = this.utils.getQueryParam('password');
       const loginError = this.utils.getQueryParam('loginError');
@@ -318,6 +390,12 @@ export class AuthService {
         if (refreshToken) {
           queryParamsToRemove.push('refreshToken');
         }
+        if (oauth2RefreshToken) {
+          queryParamsToRemove.push('oauth2RefreshToken');
+        }
+        if (oauth2ClientId) {
+          queryParamsToRemove.push('oauth2ClientId');
+        }
         this.utils.removeQueryParams(queryParamsToRemove);
         try {
           this.updateAndValidateToken(accessToken, 'jwt_token', false);
@@ -326,6 +404,11 @@ export class AuthService {
           } else {
             localStorage.removeItem('refresh_token');
             localStorage.removeItem('refresh_token_expiration');
+          }
+          // Store OAuth2 tokens for session validation
+          if (oauth2RefreshToken && oauth2ClientId) {
+            console.log('[OAuth2 Session] Received OAuth2 tokens from URL parameters');
+            AuthService.setOAuth2Tokens(oauth2RefreshToken, oauth2ClientId);
           }
         } catch (e) {
           return throwError(e);
@@ -340,9 +423,9 @@ export class AuthService {
         };
         return this.http.post<LoginResponse>('/api/auth/login', loginRequest, defaultHttpOptions()).pipe(
           mergeMap((loginResponse: LoginResponse) => {
-              this.updateAndValidateTokens(loginResponse.token, loginResponse.refreshToken, false);
-              return this.procceedJwtTokenValidate();
-            }
+            this.updateAndValidateTokens(loginResponse.token, loginResponse.refreshToken, false);
+            return this.procceedJwtTokenValidate();
+          }
           )
         );
       } else if (loginError) {
@@ -352,7 +435,15 @@ export class AuthService {
       }
       return this.procceedJwtTokenValidate(doTokenRefresh);
     } else {
-      return of({} as AuthPayload);
+      // Validate OAuth2 session on page refresh
+      return this.validateOAuth2SessionIfNeeded().pipe(
+        mergeMap(() => of({} as AuthPayload)),
+        catchError(() => {
+          // Session invalid, logout
+          this.logout(false, true);
+          return throwError(Error('OAuth2 session invalid'));
+        })
+      );
     }
   }
 
@@ -388,47 +479,66 @@ export class AuthService {
         if (authPayload.authUser?.isPublic) {
           authPayload.forceFullscreen = true;
         }
-        if (authPayload.authUser?.isPublic) {
-          this.loadSystemParams().subscribe(
-            (sysParams) => {
-              authPayload = {...authPayload, ...sysParams};
-              loadUserSubject.next(authPayload);
-              loadUserSubject.complete();
-            },
-            (err) => {
-              loadUserSubject.error(err);
+
+        // Validate OAuth2 session if OAuth2 tokens are present
+        // This ensures session validation happens on page refresh
+        this.validateOAuth2SessionIfNeeded().subscribe(
+          (sessionValid) => {
+            if (!sessionValid) {
+              console.warn('[OAuth2 Session] Session validation failed, logging out user');
+              loadUserSubject.error(new Error('OAuth2 session invalid'));
+              this.logout(false, true);
+              return;
             }
-          );
-        } else if (authPayload.authUser?.authority === Authority.PRE_VERIFICATION_TOKEN) {
-          loadUserSubject.next(authPayload);
-          loadUserSubject.complete();
-        } else if (authPayload.authUser?.userId) {
-          this.userService.getUser(authPayload.authUser.userId).subscribe(
-            (user) => {
-              authPayload.userDetails = user;
-              authPayload.forceFullscreen = false;
-              if (this.userForceFullscreen(authPayload)) {
-                authPayload.forceFullscreen = true;
-              }
+
+            // Continue with normal user loading flow
+            if (authPayload.authUser?.isPublic) {
               this.loadSystemParams().subscribe(
                 (sysParams) => {
-                  authPayload = {...authPayload, ...sysParams};
+                  authPayload = { ...authPayload, ...sysParams };
                   loadUserSubject.next(authPayload);
                   loadUserSubject.complete();
                 },
                 (err) => {
                   loadUserSubject.error(err);
+                }
+              );
+            } else if (authPayload.authUser?.authority === Authority.PRE_VERIFICATION_TOKEN) {
+              loadUserSubject.next(authPayload);
+              loadUserSubject.complete();
+            } else if (authPayload.authUser?.userId) {
+              this.userService.getUser(authPayload.authUser.userId).subscribe(
+                (user) => {
+                  authPayload.userDetails = user;
+                  authPayload.forceFullscreen = false;
+                  if (this.userForceFullscreen(authPayload)) {
+                    authPayload.forceFullscreen = true;
+                  }
+                  this.loadSystemParams().subscribe(
+                    (sysParams) => {
+                      authPayload = { ...authPayload, ...sysParams };
+                      loadUserSubject.next(authPayload);
+                      loadUserSubject.complete();
+                    },
+                    (err) => {
+                      loadUserSubject.error(err);
+                      this.logout();
+                    });
+                },
+                (err) => {
+                  loadUserSubject.error(err);
                   this.logout();
-                });
-            },
-            (err) => {
-              loadUserSubject.error(err);
-              this.logout();
+                }
+              );
+            } else {
+              loadUserSubject.error(null);
             }
-          );
-        } else {
-          loadUserSubject.error(null);
-        }
+          },
+          (err) => {
+            console.error('[OAuth2 Session] Error during session validation:', err);
+            loadUserSubject.error(err);
+          }
+        );
       },
       (err) => {
         loadUserSubject.error(err);
@@ -450,39 +560,39 @@ export class AuthService {
   public refreshJwtToken(loadUserElseStoreJwtToken = true): Observable<LoginResponse> {
     let response: Observable<LoginResponse> = this.refreshTokenSubject;
     if (this.refreshTokenSubject === null) {
-        this.refreshTokenSubject = new ReplaySubject<LoginResponse>(1);
-        response = this.refreshTokenSubject;
-        const refreshToken = AuthService._storeGet('refresh_token');
-        const refreshTokenValid = AuthService.isTokenValid('refresh_token');
-        this.setUserFromJwtToken(null, null, false);
-        if (!refreshTokenValid) {
-          this.translate.get('access.refresh-token-expired').subscribe(
-            (translation) => {
-              this.refreshTokenSubject.error(new Error(translation));
-              this.refreshTokenSubject = null;
-            }
-          );
-        } else {
-          const refreshTokenRequest = {
-            refreshToken
-          };
-          const refreshObservable = this.http.post<LoginResponse>('/api/auth/token', refreshTokenRequest, defaultHttpOptions());
-          refreshObservable.subscribe((loginResponse: LoginResponse) => {
-            if (loadUserElseStoreJwtToken) {
-              this.setUserFromJwtToken(loginResponse.token, loginResponse.refreshToken, false);
-            } else {
-              this.updateAndValidateTokens(loginResponse.token, loginResponse.refreshToken, true);
-            }
-            this.updatedAuthUserFromToken(loginResponse.token);
-            this.refreshTokenSubject.next(loginResponse);
-            this.refreshTokenSubject.complete();
+      this.refreshTokenSubject = new ReplaySubject<LoginResponse>(1);
+      response = this.refreshTokenSubject;
+      const refreshToken = AuthService._storeGet('refresh_token');
+      const refreshTokenValid = AuthService.isTokenValid('refresh_token');
+      this.setUserFromJwtToken(null, null, false);
+      if (!refreshTokenValid) {
+        this.translate.get('access.refresh-token-expired').subscribe(
+          (translation) => {
+            this.refreshTokenSubject.error(new Error(translation));
             this.refreshTokenSubject = null;
-          }, () => {
-            this.clearJwtToken();
-            this.refreshTokenSubject.error(new Error(this.translate.instant('access.refresh-token-failed')));
-            this.refreshTokenSubject = null;
-          });
-        }
+          }
+        );
+      } else {
+        const refreshTokenRequest = {
+          refreshToken
+        };
+        const refreshObservable = this.http.post<LoginResponse>('/api/auth/token', refreshTokenRequest, defaultHttpOptions());
+        refreshObservable.subscribe((loginResponse: LoginResponse) => {
+          if (loadUserElseStoreJwtToken) {
+            this.setUserFromJwtToken(loginResponse.token, loginResponse.refreshToken, false);
+          } else {
+            this.updateAndValidateTokens(loginResponse.token, loginResponse.refreshToken, true);
+          }
+          this.updatedAuthUserFromToken(loginResponse.token);
+          this.refreshTokenSubject.next(loginResponse);
+          this.refreshTokenSubject.complete();
+          this.refreshTokenSubject = null;
+        }, () => {
+          this.clearJwtToken();
+          this.refreshTokenSubject.error(new Error(this.translate.instant('access.refresh-token-failed')));
+          this.refreshTokenSubject = null;
+        });
+      }
     }
     return response;
   }
@@ -636,6 +746,57 @@ export class AuthService {
     } else {
       return false;
     }
+  }
+
+  /**
+   * Validates OAuth2 session if OAuth2 tokens are present
+   */
+  private validateOAuth2SessionIfNeeded(): Observable<boolean> {
+    const oauth2RefreshToken = AuthService.getOAuth2RefreshToken();
+    const oauth2ClientId = AuthService.getOAuth2ClientId();
+
+    if (!oauth2RefreshToken || !oauth2ClientId) {
+      // Not an OAuth2 session, skip validation
+      console.log('[OAuth2 Session] No OAuth2 tokens found, skipping session validation');
+      return of(true);
+    }
+
+    console.log('[OAuth2 Session] Validating session for client:', oauth2ClientId);
+
+    const request: OAuth2SessionValidationRequest = {
+      oauth2RefreshToken,
+      oauth2ClientId
+    };
+
+    return this.http.post<OAuth2SessionValidationResponse>(
+      '/api/auth/oauth2/validateSession',
+      request,
+      defaultHttpOptions()
+    ).pipe(
+      map(response => {
+        if (!response.valid) {
+          console.warn('[OAuth2 Session] Session validation failed:', response.reason);
+//           if (response.userChanged) {
+            console.warn('[OAuth2 Session] User has changed in OAuth2 provider');
+            // Redirect to OAuth2 login instead of just logging out
+            // This allows Keycloak to re-authenticate with the new user
+            this.redirectToOAuth2Login(oauth2ClientId);
+//           }
+          return false;
+        }
+        console.log('[OAuth2 Session] Session validation successful');
+        // Update OAuth2 tokens if they were refreshed
+        if (response.newRefreshToken) {
+          console.log('[OAuth2 Session] Updating OAuth2 refresh token');
+          AuthService.setOAuth2Tokens(response.newRefreshToken, oauth2ClientId);
+        }
+        return true;
+      }),
+      catchError(err => {
+        console.error('[OAuth2 Session] Error validating OAuth2 session:', err);
+        return of(false);
+      })
+    );
   }
 
 }

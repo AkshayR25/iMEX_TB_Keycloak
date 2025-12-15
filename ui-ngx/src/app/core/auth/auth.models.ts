@@ -14,6 +14,19 @@
 /// limitations under the License.
 ///
 
+export interface OAuth2SessionValidationRequest {
+  oauth2RefreshToken: string;
+  oauth2ClientId?: string;
+}
+
+export interface OAuth2SessionValidationResponse {
+  valid: boolean;
+  reason?: string;
+  userChanged?: boolean;
+  newAccessToken?: string;
+  newRefreshToken?: string;
+}
+
 import { AuthUser, User } from '@shared/models/user.model';
 import { UserSettings } from '@shared/models/user-settings.models';
 import { TrendzSettings } from '@shared/models/trendz-settings.models';

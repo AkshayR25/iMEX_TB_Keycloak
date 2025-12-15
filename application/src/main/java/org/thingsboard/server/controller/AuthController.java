@@ -49,8 +49,11 @@ import org.thingsboard.server.config.annotations.ApiOperation;
 import org.thingsboard.server.dao.settings.SecuritySettingsService;
 import org.thingsboard.server.queue.util.TbCoreComponent;
 import org.thingsboard.server.service.security.auth.rest.RestAuthenticationDetails;
+import org.thingsboard.server.service.security.auth.oauth2.OAuth2SessionValidator;
 import org.thingsboard.server.service.security.model.ActivateUserRequest;
 import org.thingsboard.server.service.security.model.ChangePasswordRequest;
+import org.thingsboard.server.service.security.model.OAuth2SessionValidationRequest;
+import org.thingsboard.server.service.security.model.OAuth2SessionValidationResponse;
 import org.thingsboard.server.service.security.model.ResetPasswordEmailRequest;
 import org.thingsboard.server.service.security.model.ResetPasswordRequest;
 import org.thingsboard.server.service.security.model.SecurityUser;
@@ -74,6 +77,8 @@ public class AuthController extends BaseController {
     private final SecuritySettingsService securitySettingsService;
     private final RateLimitService rateLimitService;
     private final ApplicationEventPublisher eventPublisher;
+
+    private final OAuth2SessionValidator oauth2SessionValidator;
 
 
     @ApiOperation(value = "Get current User (getUser)",
@@ -265,6 +270,32 @@ public class AuthController extends BaseController {
         } else {
             throw new ThingsboardException("Invalid reset token!", ThingsboardErrorCode.BAD_REQUEST_PARAMS);
         }
+    }
+
+    @ApiOperation(value = "Validate OAuth2 Session (validateOAuth2Session)",
+            notes = "Validates the OAuth2/Keycloak session by checking if the refresh token is still valid " +
+                    "and if the user identity matches the current logged-in user. " +
+                    "This is typically called on page refresh to ensure session consistency.")
+    @PreAuthorize("hasAnyAuthority('SYS_ADMIN', 'TENANT_ADMIN', 'CUSTOMER_USER')")
+    @PostMapping(value = "/auth/oauth2/validateSession")
+    public OAuth2SessionValidationResponse validateOAuth2Session(
+            @Parameter(description = "OAuth2 session validation request")
+            @RequestBody OAuth2SessionValidationRequest request) throws ThingsboardException {
+        
+        SecurityUser currentUser = getCurrentUser();
+        log.info("[OAuth2 Session] Validation request received from user: {}, email: {}", 
+                currentUser.getId(), currentUser.getEmail());
+        
+        OAuth2SessionValidationResponse response = oauth2SessionValidator.validateSession(
+                request.getOauth2RefreshToken(),
+                request.getOauth2ClientId(),
+                currentUser.getId()
+        );
+        
+        log.info("[OAuth2 Session] Validation response for user {}: valid={}, reason={}", 
+                currentUser.getId(), response.isValid(), response.getReason());
+        
+        return response;
     }
 
     private void logLogoutAction(HttpServletRequest request) throws ThingsboardException {

@@ -108,7 +108,14 @@ public class Oauth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
             clearAuthenticationAttributes(request, response);
 
             JwtPair tokenPair = tokenFactory.createTokenPair(securityUser);
-            getRedirectStrategy().sendRedirect(request, response, getRedirectUrl(baseUrl, tokenPair));
+            
+            // Extract OAuth2 refresh token and client ID for session validation
+            String oauth2RefreshToken = oAuth2AuthorizedClient.getRefreshToken() != null ? 
+                    oAuth2AuthorizedClient.getRefreshToken().getTokenValue() : null;
+            String oauth2ClientId = oauth2Client.getId().getId().toString();
+            
+            getRedirectStrategy().sendRedirect(request, response, 
+                    getRedirectUrl(baseUrl, tokenPair, oauth2RefreshToken, oauth2ClientId));
             systemSecurityService.logLoginAction(securityUser, new RestAuthenticationDetails(request), ActionType.LOGIN, oauth2Client.getName(), null);
         } catch (Exception e) {
             log.debug("Error occurred during processing authentication success result. " +
@@ -130,13 +137,23 @@ public class Oauth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
         httpCookieOAuth2AuthorizationRequestRepository.removeAuthorizationRequestCookies(request, response);
     }
 
-    String getRedirectUrl(String baseUrl, JwtPair tokenPair) {
+    String getRedirectUrl(String baseUrl, JwtPair tokenPair, String oauth2RefreshToken, String oauth2ClientId) {
         if (baseUrl.indexOf("?") > 0) {
             baseUrl += "&";
         } else {
             baseUrl += "/?";
         }
-        return baseUrl + "accessToken=" + tokenPair.getToken() + "&refreshToken=" + tokenPair.getRefreshToken();
+        String redirectUrl = baseUrl + "accessToken=" + tokenPair.getToken() + "&refreshToken=" + tokenPair.getRefreshToken();
+        
+        // Add OAuth2 refresh token and client ID for session validation
+        if (!StringUtils.isEmpty(oauth2RefreshToken)) {
+            redirectUrl += "&oauth2RefreshToken=" + oauth2RefreshToken;
+        }
+        if (!StringUtils.isEmpty(oauth2ClientId)) {
+            redirectUrl += "&oauth2ClientId=" + oauth2ClientId;
+        }
+        
+        return redirectUrl;
     }
 
 }
