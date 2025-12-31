@@ -16,7 +16,8 @@
 
 -->
 <div class="tb-login-content mat-app-background tb-dark flex flex-1 items-center justify-center">
-  <mat-card appearance="raised" style="max-height: 80vh; overflow-y: auto;">
+  <mat-spinner *ngIf="!showLogin" mode="indeterminate" diameter="50"></mat-spinner>
+  <mat-card *ngIf="showLogin" appearance="raised" style="max-height: 80vh; overflow-y: auto;">
     <mat-card-content>
       <form class="tb-login-form" [formGroup]="loginFormGroup" (ngSubmit)="login()">
         <fieldset class="flex flex-col">
@@ -43,7 +44,7 @@
             </div>
             <mat-form-field class="tb-appearance-transparent">
               <mat-label translate>login.username</mat-label>
-              <input id="username-input" matInput type="email" autofocus formControlName="username" email required/>
+              <input id="username-input" matInput type="email" autofocus formControlName="username" email required />
               <mat-icon matPrefix>email</mat-icon>
               <mat-error *ngIf="loginFormGroup.get('username').invalid">
                 {{ 'login.invalid-email-format' | translate }}
@@ -51,7 +52,7 @@
             </mat-form-field>
             <mat-form-field class="tb-appearance-transparent">
               <mat-label translate>common.password</mat-label>
-              <input id="password-input" matInput type="password" formControlName="password"/>
+              <input id="password-input" matInput type="password" formControlName="password" />
               <tb-toggle-password matSuffix></tb-toggle-password>
               <mat-icon matPrefix>lock</mat-icon>
             </mat-form-field>
@@ -61,8 +62,8 @@
               </button>
             </div>
             <div class="tb-action-button flex flex-col">
-              <button mat-raised-button color="accent" [disabled]="(isLoading$ | async)"
-                      type="submit">{{ 'login.login' | translate }}</button>
+              <button mat-raised-button color="accent" [disabled]="(isLoading$ | async)" type="submit">{{ 'login.login'
+                | translate }}</button>
             </div>
           </div>
         </fieldset>

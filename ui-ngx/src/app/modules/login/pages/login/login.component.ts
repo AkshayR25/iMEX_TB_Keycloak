@@ -22,7 +22,7 @@ import { PageComponent } from '@shared/components/page.component';
 import { UntypedFormBuilder } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Constants } from '@shared/models/constants';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { OAuth2ClientLoginInfo } from '@shared/models/oauth2.models';
 
 @Component({
@@ -39,16 +39,46 @@ export class LoginComponent extends PageComponent implements OnInit {
     password: ''
   });
   oauth2Clients: Array<OAuth2ClientLoginInfo> = null;
+  showLogin = false;
 
   constructor(protected store: Store<AppState>,
-              private authService: AuthService,
-              public fb: UntypedFormBuilder,
-              private router: Router) {
+    private authService: AuthService,
+    public fb: UntypedFormBuilder,
+    private router: Router,
+    private route: ActivatedRoute) {
     super(store);
   }
 
   ngOnInit() {
-    this.oauth2Clients = this.authService.oauth2Clients;
+    const isLoginParamPresent = this.route.snapshot.queryParamMap.has('login');
+
+    if (this.authService.oauth2Clients) {
+      this.oauth2Clients = this.authService.oauth2Clients;
+      this.checkRedirect(isLoginParamPresent);
+    } else {
+      this.authService.loadOAuth2Clients().subscribe(
+        (clients) => {
+          this.oauth2Clients = clients;
+          this.checkRedirect(isLoginParamPresent);
+        },
+        () => {
+          this.showLogin = true;
+        }
+      );
+    }
+  }
+
+  private checkRedirect(isLoginParamPresent: boolean) {
+    if (this.oauth2Clients && this.oauth2Clients.length > 0 && !isLoginParamPresent) {
+      const firstClient = this.oauth2Clients[0];
+      if (firstClient.url) {
+        window.location.href = this.getOAuth2Uri(firstClient);
+      } else {
+        this.showLogin = true;
+      }
+    } else {
+      this.showLogin = true;
+    }
   }
 
   login(): void {
