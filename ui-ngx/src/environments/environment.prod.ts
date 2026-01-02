@@ -15,7 +15,7 @@
 ///
 
 export const environment = {
-  appTitle: 'ThingsBoard',
+  appTitle: 'iMex For Omori',
   production: true,
 // @ts-ignore
   tbVersion: TB_VERSION,
