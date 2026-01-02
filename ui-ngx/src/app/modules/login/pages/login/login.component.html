@@ -15,9 +15,9 @@
     limitations under the License.
 
 -->
-<div class="tb-login-content mat-app-background tb-dark flex flex-1 items-center justify-center">
+<div class="tb-login-content  tb-dark flex flex-1 items-center justify-center">
   <mat-spinner *ngIf="!showLogin" mode="indeterminate" diameter="50"></mat-spinner>
-  <mat-card *ngIf="showLogin" appearance="raised" style="max-height: 80vh; overflow-y: auto;">
+  <mat-card *ngIf="showLogin" appearance="raised" style="max-height: 80vh; overflow-y: hidden; background-color:#030e1aa3  !important; color :white !important;">
     <mat-card-content>
       <form class="tb-login-form" [formGroup]="loginFormGroup" (ngSubmit)="login()">
         <fieldset class="flex flex-col">
@@ -28,7 +28,7 @@
           </mat-progress-bar>
           <span style="height: 4px;" *ngIf="!(isLoading$ | async)"></span>
           <div tb-toast class="layout-padding flex flex-col">
-            <span style="height: 50px;"></span>
+<!--            <span style="height: 50px;"></span>-->
             <div class="oauth-container tb-default flex flex-col gap-4" *ngIf="oauth2Clients?.length">
               <ng-container *ngFor="let oauth2Client of oauth2Clients">
                 <a mat-raised-button class="login-with-button" href="{{ getOAuth2Uri(oauth2Client) }}">

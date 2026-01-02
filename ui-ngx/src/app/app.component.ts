@@ -16,7 +16,7 @@
 
 import 'hammerjs';
 
-import { Component } from '@angular/core';
+import { Component, HostListener } from '@angular/core';
 
 import { environment as env } from '@env/environment';
 
@@ -41,12 +41,15 @@ import { initCustomJQueryEvents } from '@shared/models/jquery-event.models';
 })
 export class AppComponent {
 
+  private lastValidationTime = 0;
+  private readonly VALIDATION_THROTTLE_MS = 30000; // 30 seconds throttle
+
   constructor(private store: Store<AppState>,
-              private storageService: LocalStorageService,
-              private translate: TranslateService,
-              private matIconRegistry: MatIconRegistry,
-              private domSanitizer: DomSanitizer,
-              private authService: AuthService) {
+    private storageService: LocalStorageService,
+    private translate: TranslateService,
+    private matIconRegistry: MatIconRegistry,
+    private domSanitizer: DomSanitizer,
+    private authService: AuthService) {
 
     console.log(`ThingsBoard Version: ${env.tbVersion}`);
 
@@ -116,7 +119,23 @@ export class AppComponent {
   }
 
   private notifyUserLang(userLang: string) {
-    this.store.dispatch(new ActionSettingsChangeLanguage({userLang}));
+    this.store.dispatch(new ActionSettingsChangeLanguage({ userLang }));
+  }
+
+  @HostListener('document:click', ['$event'])
+  onDocumentClick(event: MouseEvent) {
+    this.validateSessionOnInteraction();
+  }
+
+  private validateSessionOnInteraction() {
+    const now = Date.now();
+    if (now - this.lastValidationTime > this.VALIDATION_THROTTLE_MS) {
+      this.lastValidationTime = now;
+      if (this.authService.refreshTokenPending()) {
+        return;
+      }
+      this.authService.validateOAuth2SessionIfNeeded().subscribe();
+    }
   }
 
 }

@@ -46,7 +46,7 @@ export class TitleService {
         .get(title)
         .pipe(filter(translatedTitle => translatedTitle !== title))
         .subscribe(translatedTitle =>
-          this.title.setTitle(`${env.appTitle} | ${translatedTitle}`)
+          this.title.setTitle(`${env.appTitle}`)
         );
     } else {
       this.title.setTitle(env.appTitle);

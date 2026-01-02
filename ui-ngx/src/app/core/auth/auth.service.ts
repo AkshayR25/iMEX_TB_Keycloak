@@ -751,7 +751,7 @@ export class AuthService {
   /**
    * Validates OAuth2 session if OAuth2 tokens are present
    */
-  private validateOAuth2SessionIfNeeded(): Observable<boolean> {
+  public validateOAuth2SessionIfNeeded(): Observable<boolean> {
     const oauth2RefreshToken = AuthService.getOAuth2RefreshToken();
     const oauth2ClientId = AuthService.getOAuth2ClientId();
 
