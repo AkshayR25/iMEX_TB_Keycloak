@@ -105,7 +105,7 @@ export class AuthService {
   private static getOAuth2ClientId() {
     const clientId = AuthService._storeGet('oauth2_client_id');
     if (clientId) {
-      console.log('[OAuth2 Session] OAuth2 client ID found in localStorage:', clientId);
+     // console.log('[OAuth2 Session] OAuth2 client ID found in localStorage:', clientId);
     }
     return clientId;
   }
@@ -113,11 +113,11 @@ export class AuthService {
   private static setOAuth2Tokens(refreshToken: string, clientId: string) {
     if (refreshToken) {
       localStorage.setItem('oauth2_refresh_token', refreshToken);
-      console.log('[OAuth2 Session] Stored OAuth2 refresh token in localStorage');
+     // console.log('[OAuth2 Session] Stored OAuth2 refresh token in localStorage');
     }
     if (clientId) {
       localStorage.setItem('oauth2_client_id', clientId);
-      console.log('[OAuth2 Session] Stored OAuth2 client ID in localStorage:', clientId);
+      //console.log('[OAuth2 Session] Stored OAuth2 client ID in localStorage:', clientId);
     }
   }
 
@@ -264,7 +264,7 @@ export class AuthService {
    * Used when user change is detected to allow seamless re-login
    */
   private redirectToOAuth2Login(clientId: string) {
-    console.log('[OAuth2 Session] Redirecting to OAuth2 login for re-authentication');
+   // console.log('[OAuth2 Session] Redirecting to OAuth2 login for re-authentication');
 
     // Find the OAuth2 client to get the login URL
     if (!this.oauth2Clients || this.oauth2Clients.length === 0) {
@@ -275,7 +275,7 @@ export class AuthService {
           // Try to find by name or just use the first OAuth2 client
           const client = clients.length > 0 ? clients[0] : null;
           if (client && client.url) {
-            console.log('[OAuth2 Session] Redirecting to:', client.url);
+          //  console.log('[OAuth2 Session] Redirecting to:', client.url);
             window.location.href = client.url;
           } else {
             console.warn('[OAuth2 Session] OAuth2 client not found, falling back to logout');
@@ -291,7 +291,7 @@ export class AuthService {
       // Use the first available OAuth2 client (typically there's only one)
       const client = this.oauth2Clients.length > 0 ? this.oauth2Clients[0] : null;
       if (client && client.url) {
-        console.log('[OAuth2 Session] Redirecting to:', client.url);
+       // console.log('[OAuth2 Session] Redirecting to:', client.url);
         window.location.href = client.url;
       } else {
         console.warn('[OAuth2 Session] OAuth2 client not found, falling back to logout');
@@ -407,7 +407,7 @@ export class AuthService {
           }
           // Store OAuth2 tokens for session validation
           if (oauth2RefreshToken && oauth2ClientId) {
-            console.log('[OAuth2 Session] Received OAuth2 tokens from URL parameters');
+            //console.log('[OAuth2 Session] Received OAuth2 tokens from URL parameters');
             AuthService.setOAuth2Tokens(oauth2RefreshToken, oauth2ClientId);
           }
         } catch (e) {
@@ -485,7 +485,7 @@ export class AuthService {
         this.validateOAuth2SessionIfNeeded().subscribe(
           (sessionValid) => {
             if (!sessionValid) {
-              console.warn('[OAuth2 Session] Session validation failed, logging out user');
+             // console.warn('[OAuth2 Session] Session validation failed, logging out user');
               loadUserSubject.error(new Error('OAuth2 session invalid'));
               this.logout(false, true);
               return;
@@ -757,11 +757,11 @@ export class AuthService {
 
     if (!oauth2RefreshToken || !oauth2ClientId) {
       // Not an OAuth2 session, skip validation
-      console.log('[OAuth2 Session] No OAuth2 tokens found, skipping session validation');
+      //console.log('[OAuth2 Session] No OAuth2 tokens found, skipping session validation');
       return of(true);
     }
 
-    console.log('[OAuth2 Session] Validating session for client:', oauth2ClientId);
+    //console.log('[OAuth2 Session] Validating session for client:', oauth2ClientId);
 
     const request: OAuth2SessionValidationRequest = {
       oauth2RefreshToken,
@@ -775,9 +775,9 @@ export class AuthService {
     ).pipe(
       map(response => {
         if (!response.valid) {
-          console.warn('[OAuth2 Session] Session validation failed:', response.reason);
+          //console.warn('[OAuth2 Session] Session validation failed:', response.reason);
 //           if (response.userChanged) {
-            console.warn('[OAuth2 Session] User has changed in OAuth2 provider');
+           // console.warn('[OAuth2 Session] User has changed in OAuth2 provider');
             // Redirect to OAuth2 login instead of just logging out
             // This allows Keycloak to re-authenticate with the new user
             this.redirectToOAuth2Login(oauth2ClientId);
@@ -787,13 +787,13 @@ export class AuthService {
         console.log('[OAuth2 Session] Session validation successful');
         // Update OAuth2 tokens if they were refreshed
         if (response.newRefreshToken) {
-          console.log('[OAuth2 Session] Updating OAuth2 refresh token');
+          //console.log('[OAuth2 Session] Updating OAuth2 refresh token');
           AuthService.setOAuth2Tokens(response.newRefreshToken, oauth2ClientId);
         }
         return true;
       }),
       catchError(err => {
-        console.error('[OAuth2 Session] Error validating OAuth2 session:', err);
+        //console.error('[OAuth2 Session] Error validating OAuth2 session:', err);
         return of(false);
       })
     );

@@ -16,13 +16,14 @@
 
 import 'hammerjs';
 
-import { Component, HostListener } from '@angular/core';
+import { Component } from '@angular/core';
 
 import { environment as env } from '@env/environment';
 
 import { TranslateService } from '@ngx-translate/core';
 import { Store } from '@ngrx/store';
 import { AppState } from '@core/core.state';
+import { Router, NavigationStart } from '@angular/router';
 import { LocalStorageService } from '@core/local-storage/local-storage.service';
 import { DomSanitizer } from '@angular/platform-browser';
 import { MatIconRegistry } from '@angular/material/icon';
@@ -41,17 +42,16 @@ import { initCustomJQueryEvents } from '@shared/models/jquery-event.models';
 })
 export class AppComponent {
 
-  private lastValidationTime = 0;
-  private readonly VALIDATION_THROTTLE_MS = 30000; // 30 seconds throttle
 
   constructor(private store: Store<AppState>,
     private storageService: LocalStorageService,
     private translate: TranslateService,
     private matIconRegistry: MatIconRegistry,
     private domSanitizer: DomSanitizer,
-    private authService: AuthService) {
+    private authService: AuthService,
+    private router: Router) {
 
-    console.log(`ThingsBoard Version: ${env.tbVersion}`);
+    //console.log(`ThingsBoard Version: ${env.tbVersion}`);
 
     this.matIconRegistry.addSvgIconResolver((name, namespace) => {
       if (namespace === 'mdi') {
@@ -59,6 +59,12 @@ export class AppComponent {
       } else {
         return null;
       }
+    });
+
+    this.router.events.pipe(
+      filter(event => event instanceof NavigationStart)
+    ).subscribe(() => {
+      this.authService.validateOAuth2SessionIfNeeded().subscribe();
     });
 
     for (const svgIcon of Object.keys(svgIcons)) {
@@ -122,20 +128,6 @@ export class AppComponent {
     this.store.dispatch(new ActionSettingsChangeLanguage({ userLang }));
   }
 
-  @HostListener('document:click', ['$event'])
-  onDocumentClick(event: MouseEvent) {
-    this.validateSessionOnInteraction();
-  }
 
-  private validateSessionOnInteraction() {
-    const now = Date.now();
-    if (now - this.lastValidationTime > this.VALIDATION_THROTTLE_MS) {
-      this.lastValidationTime = now;
-      if (this.authService.refreshTokenPending()) {
-        return;
-      }
-      this.authService.validateOAuth2SessionIfNeeded().subscribe();
-    }
-  }
 
 }

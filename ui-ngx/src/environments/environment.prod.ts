@@ -15,7 +15,7 @@
 ///
 
 export const environment = {
-  appTitle: 'iMex For Omori',
+  appTitle: 'iMEX For Omori',
   production: true,
 // @ts-ignore
   tbVersion: TB_VERSION,

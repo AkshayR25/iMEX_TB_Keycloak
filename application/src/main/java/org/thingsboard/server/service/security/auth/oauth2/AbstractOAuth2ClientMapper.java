@@ -112,10 +112,11 @@ public abstract class AbstractOAuth2ClientMapper {
                     } else {
                         user.setAuthority(Authority.CUSTOMER_USER);
                     }
-                    TenantId tenantId = oauth2User.getTenantId() != null ? oauth2User.getTenantId() : getTenantId(oauth2User.getTenantName());
+                    TenantId tenantId = oauth2User.getTenantId() != null ? oauth2User.getTenantId()
+                            : getTenantId(oauth2User.getTenantName());
                     user.setTenantId(tenantId);
-                    CustomerId customerId = oauth2User.getCustomerId() != null ?
-                            oauth2User.getCustomerId() : getCustomerId(user.getTenantId(), oauth2User.getCustomerName());
+                    CustomerId customerId = oauth2User.getCustomerId() != null ? oauth2User.getCustomerId()
+                            : getCustomerId(user.getTenantId(), oauth2User.getCustomerName());
                     user.setCustomerId(customerId);
                     user.setEmail(oauth2User.getEmail());
                     user.setFirstName(oauth2User.getFirstName());
@@ -124,10 +125,9 @@ public abstract class AbstractOAuth2ClientMapper {
                     ObjectNode additionalInfo = JacksonUtil.newObjectNode();
 
                     if (!StringUtils.isEmpty(oauth2User.getDefaultDashboardName())) {
-                        Optional<DashboardId> dashboardIdOpt =
-                                user.getAuthority() == Authority.TENANT_ADMIN ?
-                                        getDashboardId(tenantId, oauth2User.getDefaultDashboardName())
-                                        : getDashboardId(tenantId, customerId, oauth2User.getDefaultDashboardName());
+                        Optional<DashboardId> dashboardIdOpt = user.getAuthority() == Authority.TENANT_ADMIN
+                                ? getDashboardId(tenantId, oauth2User.getDefaultDashboardName())
+                                : getDashboardId(tenantId, customerId, oauth2User.getDefaultDashboardName());
                         if (dashboardIdOpt.isPresent()) {
                             additionalInfo.put("defaultDashboardFullscreen", oauth2User.isAlwaysFullScreen());
                             additionalInfo.put("defaultDashboardId", dashboardIdOpt.get().getId().toString());
@@ -136,15 +136,18 @@ public abstract class AbstractOAuth2ClientMapper {
 
                     if (oAuth2Client.getAdditionalInfo() != null &&
                             oAuth2Client.getAdditionalInfo().has("providerName")) {
-                        additionalInfo.put("authProviderName", oAuth2Client.getAdditionalInfo().get("providerName").asText());
+                        additionalInfo.put("authProviderName",
+                                oAuth2Client.getAdditionalInfo().get("providerName").asText());
                     }
 
                     user.setAdditionalInfo(additionalInfo);
 
                     user = tbUserService.save(tenantId, customerId, user, false, null, null);
                     if (config.isActivateUser()) {
-                        UserCredentials userCredentials = userService.findUserCredentialsByUserId(user.getTenantId(), user.getId());
-                        userService.activateUserCredentials(user.getTenantId(), userCredentials.getActivateToken(), passwordEncoder.encode(""));
+                        UserCredentials userCredentials = userService.findUserCredentialsByUserId(user.getTenantId(),
+                                user.getId());
+                        userService.activateUserCredentials(user.getTenantId(), userCredentials.getActivateToken(),
+                                passwordEncoder.encode(""));
                     }
                 }
             } catch (Exception e) {
@@ -153,11 +156,33 @@ public abstract class AbstractOAuth2ClientMapper {
             } finally {
                 userCreationLock.unlock();
             }
+        } else {
+            boolean userChanged = false;
+            if (!StringUtils.equals(user.getFirstName(), oauth2User.getFirstName())) {
+                user.setFirstName(oauth2User.getFirstName());
+                userChanged = true;
+            }
+            if (!StringUtils.equals(user.getLastName(), oauth2User.getLastName())) {
+                user.setLastName(oauth2User.getLastName());
+                userChanged = true;
+            }
+            if (userChanged) {
+                userCreationLock.lock();
+                try {
+                    user = tbUserService.save(user.getTenantId(), user.getCustomerId(), user, false, null, null);
+                } catch (Exception e) {
+                    log.error("Can't update security user from oauth2 user", e);
+                    throw new RuntimeException("Can't update security user from oauth2 user", e);
+                } finally {
+                    userCreationLock.unlock();
+                }
+            }
         }
 
         try {
             SecurityUser securityUser = new SecurityUser(user, true, principal);
-            return (SecurityUser) new UsernamePasswordAuthenticationToken(securityUser, null, securityUser.getAuthorities()).getPrincipal();
+            return (SecurityUser) new UsernamePasswordAuthenticationToken(securityUser, null,
+                    securityUser.getAuthorities()).getPrincipal();
         } catch (Exception e) {
             log.error("Can't get or create security user from oauth2 user", e);
             throw new RuntimeException("Can't get or create security user from oauth2 user", e);
@@ -191,7 +216,8 @@ public abstract class AbstractOAuth2ClientMapper {
     }
 
     private Optional<DashboardId> getDashboardId(TenantId tenantId, String dashboardName) {
-        return Optional.ofNullable(dashboardService.findFirstDashboardInfoByTenantIdAndName(tenantId, dashboardName)).map(IdBased::getId);
+        return Optional.ofNullable(dashboardService.findFirstDashboardInfoByTenantIdAndName(tenantId, dashboardName))
+                .map(IdBased::getId);
     }
 
     private Optional<DashboardId> getDashboardId(TenantId tenantId, CustomerId customerId, String dashboardName) {
